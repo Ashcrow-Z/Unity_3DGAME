@@ -14,6 +14,13 @@ public static class SceneBuilder
     const string MATERIALS_FOLDER = "Assets/Materials";
     static int InteractableLayer => LayerMask.NameToLayer("Interactable");
 
+    [MenuItem("SIP Lab/Rebuild Scene %#b")]
+    public static void RebuildSceneMenu()
+    {
+        var path = BuildAll();
+        Debug.Log($"[SceneBuilder] Scene rebuilt: {path}");
+    }
+
     public static string BuildAll()
     {
         EnsureFolder("Assets/Materials");
@@ -56,7 +63,8 @@ public static class SceneBuilder
     {
         public Material WallGray, FloorGray, CeilingGray, CrateOrange, EnergyCoreBlue,
             GeneratorMetal, IndicatorRed, IndicatorGreen, IndicatorYellow, KeypadDark,
-            KeypadButton, SafeMetal, SafeDoor, KeycardWhite, BlastDoor, DoorPanel, HintBoard;
+            KeypadButton, SafeMetal, SafeDoor, KeycardWhite, BlastDoor, DoorPanel, HintBoard,
+            ServerRack, ServerDrawerMat, ServerLedOff, ServerLedOn, DeskWood, Paper;
     }
 
     static Material MakeMat(string name, Color color, float metallic, float smoothness, Color? emission = null)
@@ -106,6 +114,12 @@ public static class SceneBuilder
         m.BlastDoor = MakeMat("BlastDoor", new Color(0.45f, 0.30f, 0.10f), 0.85f, 0.6f);
         m.DoorPanel = MakeMat("DoorPanel", new Color(0.20f, 0.22f, 0.25f), 0.6f, 0.5f);
         m.HintBoard = MakeMat("HintBoard", new Color(0.06f, 0.07f, 0.09f), 0.3f, 0.2f, new Color(0.05f, 0.4f, 0.5f) * 0.4f);
+        m.ServerRack = MakeMat("ServerRack", new Color(0.08f, 0.09f, 0.11f), 0.75f, 0.35f);
+        m.ServerDrawerMat = MakeMat("ServerDrawer", new Color(0.16f, 0.17f, 0.19f), 0.7f, 0.45f);
+        m.ServerLedOff = MakeMat("ServerLedOff", new Color(0.04f, 0.06f, 0.05f), 0.1f, 0.2f);
+        m.ServerLedOn = MakeMat("ServerLedOn", new Color(0.15f, 0.95f, 0.25f), 0.0f, 0.4f, new Color(0.2f, 1.0f, 0.3f) * 1.8f);
+        m.DeskWood = MakeMat("DeskWood", new Color(0.35f, 0.24f, 0.14f), 0.1f, 0.3f);
+        m.Paper = MakeMat("Paper", new Color(0.92f, 0.88f, 0.78f), 0.0f, 0.15f);
         AssetDatabase.SaveAssets();
         return m;
     }
@@ -660,25 +674,76 @@ public static class SceneBuilder
     {
         var root = new GameObject("Puzzle2_Keypad").transform;
 
-        // Hint board on west wall
-        var hintRoot = MakeEmpty("HintBoard", new Vector3(-4.85f, 2.0f, 0f), root);
-        hintRoot.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
-        var hintPanel = MakePrim(PrimitiveType.Cube, "Panel", Vector3.zero, new Vector3(2.4f, 1.0f, 0.05f), m.HintBoard, hintRoot.transform);
-        var hintTextGO = new GameObject("HintText");
-        hintTextGO.transform.SetParent(hintRoot.transform, false);
-        // +Z offset so text sits in front of panel (panel is rotated Y=90, +Z = into room)
-        hintTextGO.transform.localPosition = new Vector3(0f, 0f, 0.04f);
-        // TextMesh's readable face is on its local -Z. Rotate Y=180 so readable side faces the room.
-        hintTextGO.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        var hintText = hintTextGO.AddComponent<TextMesh>();
-        hintText.text = "ACCESS: 7294";
-        hintText.fontSize = 80;
-        hintText.characterSize = 0.05f;
-        hintText.color = new Color(0.6f, 1f, 1f);
-        hintText.anchor = TextAnchor.MiddleCenter;
-        hintText.alignment = TextAlignment.Center;
-        var mr = hintTextGO.GetComponent<MeshRenderer>();
-        if (mr != null) mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        // =============================================================
+        // Binary server rack on SOUTH wall (replaces the old hint board).
+        // Encodes the 4-digit code 7294 across four rows of four drawers.
+        // Drawers with Bit=1 extrude from the wall + turn a green LED on
+        // once the player restores power. Drawers with Bit=0 stay dormant.
+        // Facing +Z (into room); no rotation needed — local axes align with
+        // world axes. Player standing inside the room looks toward -Z so
+        // their LEFT is world +X → col=0 (MSB, weight 8) maps to local +X.
+        // =============================================================
+        var arrayRoot = MakeEmpty("BinaryServerArray", new Vector3(0f, 1.9f, -4.95f), root);
+        // identity rotation: drawer front faces +Z = into the room
+
+        // Rack backplate (dark recessed panel that drawers are set into)
+        MakePrim(PrimitiveType.Cube, "RackBackplate", new Vector3(0f, 0f, -0.05f), new Vector3(2.3f, 2.3f, 0.06f), m.ServerRack, arrayRoot.transform);
+        // Outer frame (subtle lighter bevel around the rack)
+        MakePrim(PrimitiveType.Cube, "RackFrameTop",    new Vector3( 0f,  1.10f, -0.02f), new Vector3(2.4f, 0.10f, 0.10f), m.GeneratorMetal, arrayRoot.transform);
+        MakePrim(PrimitiveType.Cube, "RackFrameBottom", new Vector3( 0f, -1.10f, -0.02f), new Vector3(2.4f, 0.10f, 0.10f), m.GeneratorMetal, arrayRoot.transform);
+        MakePrim(PrimitiveType.Cube, "RackFrameLeft",   new Vector3(-1.15f, 0f, -0.02f), new Vector3(0.10f, 2.3f, 0.10f), m.GeneratorMetal, arrayRoot.transform);
+        MakePrim(PrimitiveType.Cube, "RackFrameRight",  new Vector3( 1.15f, 0f, -0.02f), new Vector3(0.10f, 2.3f, 0.10f), m.GeneratorMetal, arrayRoot.transform);
+
+        // Password 7294 -> binary (MSB left):
+        //   row 0: 7 = 0 1 1 1
+        //   row 1: 2 = 0 0 1 0
+        //   row 2: 9 = 1 0 0 1
+        //   row 3: 4 = 0 1 0 0
+        int[,] bits = new int[4, 4] {
+            { 0, 1, 1, 1 },
+            { 0, 0, 1, 0 },
+            { 1, 0, 0, 1 },
+            { 0, 1, 0, 0 },
+        };
+
+        var array = arrayRoot.AddComponent<BinaryServerArray>();
+        array.Drawers = new ServerDrawer[16];
+
+        const float cellSpacing = 0.5f;
+        for (int row = 0; row < 4; row++)
+        {
+            for (int col = 0; col < 4; col++)
+            {
+                // South-wall mount with identity rotation. Player faces -Z (toward
+                // the wall); their LEFT is world +X. We want col=0 (MSB, weight 8)
+                // on the player's LEFT so MSB-left numeral reading is preserved.
+                float localX = (1.5f - col) * cellSpacing;  // col0:+0.75 (player's left)  col3:-0.75 (player's right)
+                float localY = (1.5f - row) * cellSpacing;  // row0:+0.75 (top)            row3:-0.75 (bottom)
+
+                var cellRoot = MakeEmpty("Cell_R" + row + "_C" + col, new Vector3(localX, localY, 0f), arrayRoot.transform);
+
+                // Drawer body: 0.42 x 0.42 x 0.25, centered so front face is flush with wall (z=0) when retracted.
+                var body = MakePrim(PrimitiveType.Cube, "Drawer", new Vector3(0f, 0f, -0.125f), new Vector3(0.42f, 0.42f, 0.25f), m.ServerDrawerMat, cellRoot.transform);
+                // Thin LED strip on the front face (bottom edge)
+                var led = MakePrim(PrimitiveType.Cube, "LED", new Vector3(0f, -0.16f, 0.52f), new Vector3(0.65f, 0.08f, 0.04f), m.ServerLedOff, body.transform);
+                // (LED local scale is divided by body scale because it's a child; we used 0.65 x 0.08 x 0.04 = ~0.27 x 0.034 x 0.01 in world.)
+
+                var drawer = body.AddComponent<ServerDrawer>();
+                drawer.Bit = bits[row, col] == 1;
+                drawer.DrawerBody = body.transform;
+                drawer.LedRenderer = led.GetComponent<Renderer>();
+                drawer.LedOffMaterial = m.ServerLedOff;
+                drawer.LedOnMaterial = m.ServerLedOn;
+                array.Drawers[row * 4 + col] = drawer;
+            }
+        }
+
+        // =============================================================
+        // Codebook desk — a short wooden desk with a printed paper note
+        // showing the binary-to-decimal legend. Positioned near the
+        // player's natural exploration path from spawn to the crates.
+        // =============================================================
+        BuildCodebookDesk(m, root);
 
         // Safe on east wall north of generator
         var safeRoot = MakeEmpty("Safe", new Vector3(4.5f, 1.2f, 2.5f), root);
@@ -754,6 +819,89 @@ public static class SceneBuilder
             t.anchor = TextAnchor.MiddleCenter;
             t.alignment = TextAlignment.Center;
         }
+    }
+
+    // =============================================================
+    // Codebook desk — pushed against the east wall. The access legend
+    // is printed on a flat paper sheet laid directly on the desk top,
+    // so the player reads it by looking down rather than face-on. This
+    // avoids any TextMesh orientation ambiguity and matches the look of
+    // an in-universe developer handbook lying on a workbench.
+    // =============================================================
+    static void BuildCodebookDesk(Mats m, Transform root)
+    {
+        // East wall inside face is at x = 5.0. Desk depth (along X) = 0.8 m.
+        // Centre at x = 4.55 so the desk back touches the wall (right edge at
+        // x = 4.95, 5 cm margin). Desk length along Z is 1.2 m between the
+        // generator (z = -3) and the safe (z = +2.5).
+        var deskRoot = MakeEmpty("CodebookDesk", new Vector3(4.55f, 0f, 0f), root);
+
+        // Desk top: 0.8 m deep × 0.06 m thick × 1.2 m long
+        MakePrim(PrimitiveType.Cube, "Top", new Vector3(0f, 0.78f, 0f), new Vector3(0.8f, 0.06f, 1.2f), m.DeskWood, deskRoot.transform);
+
+        // Four legs at the underside corners of the desk top.
+        float lx = 0.36f, lz = 0.56f;
+        MakePrim(PrimitiveType.Cube, "LegFL", new Vector3(-lx, 0.375f, -lz), new Vector3(0.06f, 0.75f, 0.06f), m.DeskWood, deskRoot.transform);
+        MakePrim(PrimitiveType.Cube, "LegFR", new Vector3(-lx, 0.375f,  lz), new Vector3(0.06f, 0.75f, 0.06f), m.DeskWood, deskRoot.transform);
+        MakePrim(PrimitiveType.Cube, "LegBL", new Vector3( lx, 0.375f, -lz), new Vector3(0.06f, 0.75f, 0.06f), m.DeskWood, deskRoot.transform);
+        MakePrim(PrimitiveType.Cube, "LegBR", new Vector3( lx, 0.375f,  lz), new Vector3(0.06f, 0.75f, 0.06f), m.DeskWood, deskRoot.transform);
+
+        // Paper sheet lying flat on the desk. 2 mm thick so the legend that
+        // sits a fraction of a millimetre above it reads as printed, not
+        // floating. Sized slightly larger than the visible text so there is
+        // a clear paper border around every glyph.
+        MakePrim(PrimitiveType.Cube, "Paper", new Vector3(-0.06f, 0.813f, 0f), new Vector3(0.45f, 0.002f, 0.35f), m.Paper, deskRoot.transform);
+
+        // Legend text — just the four binary-weight rows, no commentary; the
+        // player is expected to work out the meaning on their own.
+        //
+        // Orientation: TextMesh's readable face is local -Z; rotating X=+90°
+        // maps local -Z to world +Y, so the text is readable when looking
+        // down at the desk. Local +Y then maps to world +Z → text "top"
+        // faces north (matching the approach direction from spawn).
+        //
+        // Sizing: TextMesh on a dynamic font produces very large glyphs at
+        // fontSize=80 / characterSize=0.02 (≈ 0.06 m per character), which
+        // overflowed the paper and the desk. The GameObject is uniformly
+        // scaled down to 35 % so the widest row of 13 characters lands at
+        // ≈ 0.28 m — comfortably inside the 0.45 m paper — with a ≈ 0.11 m
+        // block of 4 lines inside the 0.35 m paper depth.
+        //
+        // Y position is 0.5 mm above the paper top (paper top = 0.814),
+        // so the glyphs appear printed on the sheet without z-fighting.
+        var textGO = new GameObject("LegendText");
+        textGO.transform.SetParent(deskRoot.transform, false);
+        textGO.transform.localPosition = new Vector3(-0.06f, 0.8145f, 0f);
+        textGO.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        textGO.transform.localScale = new Vector3(0.35f, 0.35f, 0.35f);
+        var tm = textGO.AddComponent<TextMesh>();
+        tm.text =
+            "[X - - -] = 8\n" +
+            "[- X - -] = 4\n" +
+            "[- - X -] = 2\n" +
+            "[- - - X] = 1";
+        tm.characterSize = 0.02f;
+        tm.fontSize = 80;
+        tm.color = new Color(0.08f, 0.06f, 0.04f);
+        tm.anchor = TextAnchor.MiddleCenter;
+        tm.alignment = TextAlignment.Center;
+
+        // Warm desk lamp so the desk remains a visible focal point even under
+        // red alarm lighting. Positioned at the back-right corner so it stays
+        // out of the player's reading line of sight.
+        var lampGO = new GameObject("DeskLamp");
+        lampGO.transform.SetParent(deskRoot.transform, false);
+        lampGO.transform.localPosition = new Vector3(0.28f, 1.35f, 0.48f);
+        var lamp = lampGO.AddComponent<Light>();
+        lamp.type = LightType.Point;
+        lamp.color = new Color(1.0f, 0.85f, 0.55f);
+        lamp.intensity = 1.0f;
+        lamp.range = 3.0f;
+        var bulb = MakePrim(PrimitiveType.Sphere, "Bulb", Vector3.zero, new Vector3(0.08f, 0.08f, 0.08f), m.IndicatorYellow, lampGO.transform);
+        Object.DestroyImmediate(bulb.GetComponent<Collider>());
+
+        // Thin vertical lamp stand from desk surface up to the bulb.
+        MakePrim(PrimitiveType.Cube, "LampStand", new Vector3(0.28f, 1.05f, 0.48f), new Vector3(0.04f, 0.5f, 0.04f), m.GeneratorMetal, deskRoot.transform);
     }
 
     public static void BuildPuzzle3(Mats m)

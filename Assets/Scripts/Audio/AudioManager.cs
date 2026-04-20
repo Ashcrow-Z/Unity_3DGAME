@@ -25,7 +25,7 @@ namespace SipLab
 
         AudioClip _pickup, _keycardPickup, _powerOn, _keypadBeep,
                   _success, _error, _keycardSwipe, _doorOpen, _safeOpen,
-                  _footstep, _crateThud, _victory;
+                  _footstep, _crateThud, _victory, _rackActivate;
 
         void Awake()
         {
@@ -98,6 +98,7 @@ namespace SipLab
         public void PlayBlastDoor() { PlayInteract(_doorOpen, 1f, 1f); }
         public void PlaySafeDoor() { PlayInteract(_safeOpen, 0.85f, 1.05f); }
         public void PlayVictory() { PlayInteract(_victory, 1f, 1f); }
+        public void PlayRackActivate() { PlayInteract(_rackActivate, 1f, 1f); }
 
         public void PlayFootstep()
         {
@@ -129,6 +130,7 @@ namespace SipLab
             _footstep = Synth.Footstep("sfx_step");
             _crateThud = Synth.CrateThud("sfx_thud");
             _victory = Synth.VictoryFanfare("sfx_victory");
+            _rackActivate = Synth.RackActivate("sfx_rack");
         }
     }
 
@@ -330,6 +332,56 @@ namespace SipLab
                 float env = Env(i, chordDur, 0.04f, 0.45f);
                 data[cursor + i] = s * trem * env;
             }
+            return MakeClip(name, data);
+        }
+
+        public static AudioClip RackActivate(string name)
+        {
+            // ~2.2 s of low mechanical rumble with four "clunk" transients timed
+            // to align with BinaryServerArray.RowDelay (0.4 s). Each clunk is a
+            // short low-freq sine burst layered over filtered noise so it feels
+            // like a physical drawer sliding out.
+            float dur = 2.2f;
+            int n = Mathf.RoundToInt(SR * dur);
+            var data = new float[n];
+
+            // ------ base rumble: 45 Hz + 90 Hz harmonic, slow tremolo ------
+            float prev = 0f;
+            float a = Mathf.Clamp01(2f * Mathf.PI * 400f / SR);
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)SR;
+                float rumble = Mathf.Sin(2f * Mathf.PI * 45f * t) * 0.35f
+                             + Mathf.Sin(2f * Mathf.PI * 90f * t) * 0.18f;
+                float white = Random.Range(-1f, 1f);
+                prev = prev + a * (white - prev);
+                float trem = 0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 3.5f * t);
+                float env = Env(i, n, 0.1f, 0.4f);
+                data[i] = (rumble + prev * 0.25f) * trem * env;
+            }
+
+            // ------ four mechanical clunks at 0.05, 0.45, 0.85, 1.25 s ------
+            float[] clunkTimes = { 0.05f, 0.45f, 0.85f, 1.25f };
+            for (int k = 0; k < clunkTimes.Length; k++)
+            {
+                int start = Mathf.RoundToInt(SR * clunkTimes[k]);
+                int clunkLen = Mathf.RoundToInt(SR * 0.18f);
+                float baseFreq = 120f - k * 10f; // slight pitch descent per row
+                float clunkPrev = 0f;
+                float clunkA = Mathf.Clamp01(2f * Mathf.PI * 800f / SR);
+                for (int i = 0; i < clunkLen && start + i < n; i++)
+                {
+                    float t = i / (float)SR;
+                    float body = Mathf.Sin(2f * Mathf.PI * baseFreq * t) * 0.55f;
+                    float w = Random.Range(-1f, 1f);
+                    clunkPrev = clunkPrev + clunkA * (w - clunkPrev);
+                    float env = Mathf.Exp(-t * 22f);
+                    data[start + i] += (body + clunkPrev * 0.45f) * env;
+                }
+            }
+
+            // clamp
+            for (int i = 0; i < n; i++) data[i] = Mathf.Clamp(data[i], -1f, 1f);
             return MakeClip(name, data);
         }
 

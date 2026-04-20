@@ -32,9 +32,9 @@ The player assumes the role of a junior researcher working late inside the SIP L
 
 Three design decisions distinguish *The SIP Lab Lockdown* from typical student escape games:
 
-1. **Causal puzzle progression** — every puzzle physically and narratively unlocks the next: only after power is restored does the keypad illuminate, and only after the safe yields the keycard can the blast door react to the terminal. There is no "hidden flag" gating; the player can verify the chain visually at every step.
-2. **Fully diegetic interface** — the password is read from a sign on the wall, entered on a 3D keypad mounted in world-space, confirmed by an in-world `E` key on that same keypad, and acknowledged by a glowing `OK` panel on the device itself. No 2D pop-up windows interrupt immersion.
-3. **Procedural audio aesthetic** — instead of importing free-licensed sound libraries, every cue (footsteps, crate impacts, keypad beeps, success chord, error buzz, victory fanfare) is generated at runtime from elementary waveforms. This unifies the soundscape and avoids the "asset-pack collage" feel common in student work.
+1. **Causal puzzle progression** — every puzzle physically and narratively unlocks the next: only after power is restored does the server rack animate open and the keypad illuminate, and only after the safe yields the keycard can the blast door react to the terminal. There is no "hidden flag" gating; the player can verify the chain visually at every step.
+2. **Kinetic binary display as diegetic hint** — rather than writing the password on a sign, the access code is encoded in a 4 × 4 array of wall-mounted server drawers. When power returns, drawers whose bit is `1` physically extrude from the wall and light a green LED; drawers whose bit is `0` stay flush and dark. Combined with a separately-placed codebook paper that provides the 4-bit weight legend, this turns Puzzle 2 into a genuine observation-and-reasoning task rather than a memory read. The keypad itself is also diegetic — buttons are world-space cubes confirmed by an in-world `E` key — so no 2D pop-up windows interrupt immersion.
+3. **Procedural audio aesthetic** — instead of importing free-licensed sound libraries, every cue (footsteps, crate impacts, keypad beeps, success chord, error buzz, rack-activation rumble, victory fanfare) is generated at runtime from elementary waveforms. This unifies the soundscape and avoids the "asset-pack collage" feel common in student work.
 
 ### 1.4 Related Work
 
@@ -54,27 +54,27 @@ The play space is a sealed concrete laboratory with steel-grey walls and a low c
 
 - **South-west corner — Crate Stack**: five 1 × 1 × 1 m crates with `Rigidbody` components stacked above the hidden energy core.
 - **East wall — Generator Terminal**: a grey console with a red receptacle for the energy core.
-- **East wall — Safe + Keypad**: a small wall safe with a hinged door, flanked by a 3 × 4 in-world keypad.
-- **South wall — Hint Board**: a backlit panel reading `ACCESS: 7294`.
+- **West wall — 3 × 4 Keypad** and **East wall — Wall Safe**: the two halves of the second puzzle, deliberately separated so the player must traverse the room while entering the code.
+- **South wall — Binary Server Rack**: a 4 × 4 array of wall-mounted server drawers that visually encodes the access code in binary once power is restored.
+- **East half of the room — Codebook Desk**: a small lit desk carrying a maintenance log that provides the binary-weight legend needed to decode the rack.
 - **North wall — Blast Door + Door Terminal**: a two-leaf sliding door with a card-reader terminal.
 
 ```
   ┌──────── NORTH WALL ────────┐
   │      [BLAST DOOR + TERM]   │
   │                            │
-W │  [KEYPAD]                  │ E
-A │  [SAFE]                    │ A
+W │  [KEYPAD]         [SAFE]   │ E
+A │                            │ A
+L │              [CODEBOOK]    │ L
 L │                            │ L
-L │                            │ L
-  │  [CRATES]   [GENERATOR]    │
+  │  [CRATES]    [GENERATOR]   │
+  │     (Player Spawn)         │
   │                            │
+  ├── [BINARY SERVER RACK] ────┤
   └──────── SOUTH WALL ────────┘
-              ↑
-        [HINT BOARD]
-        (Player Spawn)
 ```
 
-*Figure 1. Top-down schematic of the laboratory layout. The player spawns facing north so that the hint board and blast door are visible on first turn.*
+*Figure 1. Top-down schematic of the laboratory layout. The player spawns in the south-centre facing north; the server rack is embedded behind the spawn so the player only notices its reveal after restoring power, creating a deliberate "turn-around" moment.*
 
 ### 2.3 Game Interactions
 
@@ -94,7 +94,7 @@ public interface IInteractable
 The three puzzles map onto three escalating interaction grammars:
 
 1. **Physics manipulation (Puzzle 1)** — the energy core is hidden under the crate stack. The player must walk into the crates to topple them, exploiting Unity's PhysX to produce believable rolling and stacking. The core is then carried to the generator and inserted by interaction. A `LightingController` listens for the `OnPowerRestored` event and lerps every red light's intensity to zero while ramping the white directional light from 0 to 1.2 over 1.5 seconds, producing a smooth atmospheric reveal.
-2. **Symbolic input (Puzzle 2)** — the 3D keypad is a 3 × 4 grid of `KeypadButton` components, each with a child `TextMesh` label. Each button is itself an `IInteractable` whose `Interact()` method appends a digit, clears the buffer (`C`) or confirms the entry (`E`). The puzzle is gated on `GameStateManager.IsPowerOn` so the keypad is electrically dead during Puzzle 1. On a correct match the safe door rotates 90° around a hinge pivot and a keycard becomes interactable; on a wrong match the display flashes `ERR` and clears.
+2. **Visual decoding + symbolic input (Puzzle 2)** — a two-stage reasoning puzzle. First, the moment power is restored, a 4 × 4 wall-mounted server rack on the south wall animates itself open: drawers whose bit value is `1` extrude from the wall and light a green LED, row-by-row with a 0.4 s beat, while `0`-drawers stay dormant. Each of the four rows therefore encodes one decimal digit in 4-bit binary (MSB left). A paper maintenance log lying on a lit desk on the east side of the room supplies the weight table (`[■ □ □ □] = 8`, `[□ ■ □ □] = 4`, `[□ □ ■ □] = 2`, `[□ □ □ ■] = 1`); the player sums the lit drawers in each row to recover the code `7 2 9 4`. Second, the 3D keypad (a 4 × 3 grid of `KeypadButton` components) is used to enter the digits; each button is itself an `IInteractable` whose `Interact()` method appends a digit, clears the buffer (`C`) or confirms the entry (`E`). The puzzle is gated on `GameStateManager.IsPowerOn`, so both the rack and the keypad are electrically dead during Puzzle 1. On a correct match the safe door rotates 90° around a hinge pivot and a keycard becomes interactable; on a wrong match the display flashes `ERR` and clears.
 3. **Conditional unlock (Puzzle 3)** — the blast door terminal checks two flags simultaneously (`IsPowerOn && HasKeycard`). When both are true the two door leaves slide outward over 2 seconds, a hidden `BoxCollider` `Trigger` becomes active 1 m beyond the threshold, and walking through it raises the `OnVictory` event which freezes time, displays the elapsed timer and shows the victory canvas.
 
 ### 2.5 Underlying Theory
@@ -115,17 +115,21 @@ The puzzle progression follows the **Mechanic / Dynamic / Aesthetic** (MDA) fram
 *Figure 2. HUD layout. A central reticle, a context prompt only when an interactable is targeted, a timer in the lower-left corner and an inventory readout in the lower-right.*
 
 ```
-  ┌─────────────────┐
-  │     7 2 9 4     │   <-- 16-segment style display
-  ├─────────────────┤
-  │  [1] [2] [3]    │
-  │  [4] [5] [6]    │
-  │  [7] [8] [9]    │
-  │  [E] [0] [C]    │
-  └─────────────────┘
+  BINARY SERVER RACK (after power on)            CODEBOOK (on desk)
+  ┌───────────────────────────┐                  ┌─────────────────────┐
+  │  □  ■  ■  ■   = 7  (MSB)  │                  │  MAINTENANCE LOG    │
+  │  □  □  ■  □   = 2         │                  │                     │
+  │  ■  □  □  ■   = 9         │                  │  [■ □ □ □]  =  8    │
+  │  □  ■  □  □   = 4  (LSB)  │                  │  [□ ■ □ □]  =  4    │
+  └───────────────────────────┘                  │  [□ □ ■ □]  =  2    │
+     │                                           │  [□ □ □ ■]  =  1    │
+     ▼   decode using legend                     │                     │
+     Access code = 7294                          │  Sum lit drawers    │
+                                                 │  per row.           │
+                                                 └─────────────────────┘
 ```
 
-*Figure 3. The 3D in-world keypad. `E` confirms the entry, `C` clears the buffer. Each press protrudes briefly to give tactile feedback and emits a procedurally-synthesised square-wave beep whose pitch encodes the digit value.*
+*Figure 3. Puzzle 2 in its two halves. Left: the 4 × 4 server rack. Each row is one decimal digit; ■ is a drawer that physically extruded from the wall with a green LED lit, □ is a drawer that stayed flush and dark. Right: the maintenance-log paper on the codebook desk, giving the 4-bit weight legend. Players sum the lit drawers in each row (e.g. row 1: 0 + 4 + 2 + 1 = 7) to recover the four access digits, then enter `7294` on the keypad.*
 
 ---
 
@@ -188,6 +192,8 @@ Five informal play-testers (university students, no prior knowledge of the game)
 - Three of five initially tried to interact with the keypad before restoring power, observed that nothing happened, and inferred that another step was required — exactly the intended chain.
 - Two testers reported the original keypad button labels were difficult to read at a glance; this prompted the late-stage tuning of label scale and back-plate dimensions.
 - All five spontaneously commented positively on the colour-temperature transition when power was restored, describing it as "satisfying" or "the moment it felt like a real game".
+- For the binary-rack puzzle, four of the five testers intuitively understood, after finding the codebook paper, that each row encoded one decimal digit via the weight table; the fifth tester needed to re-read the maintenance log twice before connecting the rack rows to the legend, which was judged a desirable difficulty level rather than a usability failure.
+- Three testers explicitly reported a strong "turn-around moment" when the rack animated open behind them after they restored power at the generator on the opposite wall; the row-by-row extrusion with the low mechanical rumble was singled out as the most memorable event in the playthrough.
 
 No tester reported motion sickness, ambiguity in controls, or accidental softlocks.
 
