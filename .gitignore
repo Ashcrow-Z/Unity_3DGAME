@@ -34,6 +34,14 @@
 # Visual Studio cache directory
 .vs/
 
+# IDE
+.vs/
+*.csproj
+*.sln
+
+# Cursor 编辑器
+.cursor/
+
 # Gradle cache directory
 .gradle/
 
