@@ -7213,7 +7213,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   DoorPivot: {fileID: 1005278534}
   KeycardObject: {fileID: 1188517487}
-  OpenAngle: 110
+  OpenAngle: -110
   Duration: 1
 --- !u!23 &579783195
 MeshRenderer:

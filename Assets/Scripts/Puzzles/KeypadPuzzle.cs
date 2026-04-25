@@ -5,7 +5,8 @@ namespace SipLab
 {
     public class KeypadPuzzle : MonoBehaviour
     {
-        public string TargetCode = "7294";
+        [Tooltip("Overwritten at run start from GameStateManager.AccessCode.")]
+        public string TargetCode = "";
         public TextMesh DisplayText;
         public SafeDoor Safe;
         public int MaxLength = 4;
@@ -16,6 +17,29 @@ namespace SipLab
 
         void Start()
         {
+            var gsm = GameStateManager.Instance;
+            if (gsm != null)
+            {
+                gsm.OnRunStarted += ApplyAccessCode;
+                if (!string.IsNullOrEmpty(gsm.AccessCode) && gsm.AccessCode.Length == 4)
+                    ApplyAccessCode();
+            }
+            UpdateDisplay();
+        }
+
+        void OnDestroy()
+        {
+            if (GameStateManager.Instance != null)
+                GameStateManager.Instance.OnRunStarted -= ApplyAccessCode;
+        }
+
+        void ApplyAccessCode()
+        {
+            var gsm = GameStateManager.Instance;
+            if (gsm == null || string.IsNullOrEmpty(gsm.AccessCode) || gsm.AccessCode.Length != 4) return;
+            TargetCode = gsm.AccessCode;
+            _solved = false;
+            _input = "";
             UpdateDisplay();
         }
 

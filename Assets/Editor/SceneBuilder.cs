@@ -676,7 +676,7 @@ public static class SceneBuilder
 
         // =============================================================
         // Binary server rack on SOUTH wall (replaces the old hint board).
-        // Encodes the 4-digit code 7294 across four rows of four drawers.
+        // Encodes the 4-digit access code (runtime-random per run) across four rows of four drawers.
         // Drawers with Bit=1 extrude from the wall + turn a green LED on
         // once the player restores power. Drawers with Bit=0 stay dormant.
         // Facing +Z (into room); no rotation needed — local axes align with
@@ -694,7 +694,7 @@ public static class SceneBuilder
         MakePrim(PrimitiveType.Cube, "RackFrameLeft",   new Vector3(-1.15f, 0f, -0.02f), new Vector3(0.10f, 2.3f, 0.10f), m.GeneratorMetal, arrayRoot.transform);
         MakePrim(PrimitiveType.Cube, "RackFrameRight",  new Vector3( 1.15f, 0f, -0.02f), new Vector3(0.10f, 2.3f, 0.10f), m.GeneratorMetal, arrayRoot.transform);
 
-        // Password 7294 -> binary (MSB left):
+        // Example layout (bits overwritten at run start from GameStateManager.AccessCode):
         //   row 0: 7 = 0 1 1 1
         //   row 1: 2 = 0 0 1 0
         //   row 2: 9 = 1 0 0 1
@@ -748,19 +748,31 @@ public static class SceneBuilder
         // Safe on east wall north of generator
         var safeRoot = MakeEmpty("Safe", new Vector3(4.5f, 1.2f, 2.5f), root);
         safeRoot.transform.rotation = Quaternion.Euler(0f, -90f, 0f);
-        var safeBody = MakePrim(PrimitiveType.Cube, "SafeBody", Vector3.zero, new Vector3(1.0f, 1.0f, 0.6f), m.SafeMetal, safeRoot.transform);
-        // Door pivot at left edge of safe (x=-0.5 on body's local axis)
-        var doorPivot = MakeEmpty("DoorPivot", new Vector3(-0.5f, 0f, -0.32f), safeRoot.transform);
-        var doorPanel = MakePrim(PrimitiveType.Cube, "DoorPanel", new Vector3(0.45f, 0f, 0f), new Vector3(0.9f, 0.9f, 0.04f), m.SafeDoor, doorPivot.transform);
+        // Hollow safe body: back panel plus four thick side walls. The center
+        // remains empty so the keycard is visible after the two-piece door opens.
+        MakePrim(PrimitiveType.Cube, "SafeBackPanel", new Vector3(0f, 0f, -0.29f), new Vector3(0.86f, 0.86f, 0.04f), m.SafeMetal, safeRoot.transform);
+        MakePrim(PrimitiveType.Cube, "SafeLeftWall", new Vector3(-0.48f, 0f, 0f), new Vector3(0.08f, 1.0f, 0.6f), m.SafeMetal, safeRoot.transform);
+        MakePrim(PrimitiveType.Cube, "SafeRightWall", new Vector3(0.48f, 0f, 0f), new Vector3(0.08f, 1.0f, 0.6f), m.SafeMetal, safeRoot.transform);
+        MakePrim(PrimitiveType.Cube, "SafeTopWall", new Vector3(0f, 0.48f, 0f), new Vector3(1.0f, 0.08f, 0.6f), m.SafeMetal, safeRoot.transform);
+        MakePrim(PrimitiveType.Cube, "SafeBottomWall", new Vector3(0f, -0.48f, 0f), new Vector3(1.0f, 0.08f, 0.6f), m.SafeMetal, safeRoot.transform);
+        // Two-piece front face. The safe's local +Z is the outward/front
+        // direction and maps to world -X (west), so the panels pop out into
+        // the room before sliding apart across the face.
+        var leftDoor = MakePrim(PrimitiveType.Cube, "LeftDoorPanel", new Vector3(-0.225f, 0f, 0.32f), new Vector3(0.44f, 0.9f, 0.04f), m.SafeDoor, safeRoot.transform);
+        var rightDoor = MakePrim(PrimitiveType.Cube, "RightDoorPanel", new Vector3(0.225f, 0f, 0.32f), new Vector3(0.44f, 0.9f, 0.04f), m.SafeDoor, safeRoot.transform);
         // Keycard inside safe (initially disabled)
         var keycard = MakePrim(PrimitiveType.Cube, "Keycard", new Vector3(0f, 0f, 0.05f), new Vector3(0.4f, 0.25f, 0.02f), m.KeycardWhite, safeRoot.transform);
         keycard.layer = InteractableLayer;
         keycard.AddComponent<KeycardPickup>();
         keycard.SetActive(false);
 
-        var safeDoor = safeBody.AddComponent<SafeDoor>();
-        safeDoor.DoorPivot = doorPivot.transform;
+        var safeDoorController = MakeEmpty("SafeDoorController", Vector3.zero, safeRoot.transform);
+        var safeDoor = safeDoorController.AddComponent<SafeDoor>();
+        safeDoor.LeftDoor = leftDoor.transform;
+        safeDoor.RightDoor = rightDoor.transform;
         safeDoor.KeycardObject = keycard;
+        safeDoor.PopDistance = 0.18f;
+        safeDoor.SlideDistance = 0.55f;
 
         // Keypad on west wall (next to hint, lower)
         var keypadRoot = MakeEmpty("Keypad", new Vector3(-4.85f, 1.3f, -2f), root);
@@ -781,7 +793,7 @@ public static class SceneBuilder
         displayText.alignment = TextAlignment.Center;
 
         var puzzle = keypadRoot.AddComponent<KeypadPuzzle>();
-        puzzle.TargetCode = "7294";
+        puzzle.TargetCode = "";
         puzzle.DisplayText = displayText;
         puzzle.Safe = safeDoor;
 

@@ -29,11 +29,44 @@ namespace SipLab
 
         void Start()
         {
+            var gsm = GameStateManager.Instance;
+            if (gsm != null)
+            {
+                gsm.OnRunStarted += ApplyBitsFromAccessCode;
+                if (!string.IsNullOrEmpty(gsm.AccessCode) && gsm.AccessCode.Length == 4)
+                    ApplyBitsFromAccessCode();
+            }
             // Subscribe in Start (not OnEnable) to guarantee GameStateManager
             // has finished its Awake and Instance is non-null. Matches the
             // pattern used by GeneratorTerminal and avoids a race condition
             // where OnEnable could fire before GameStateManager.Awake.
             TrySubscribe();
+        }
+
+        void OnDestroy()
+        {
+            if (GameStateManager.Instance != null)
+                GameStateManager.Instance.OnRunStarted -= ApplyBitsFromAccessCode;
+        }
+
+        void ApplyBitsFromAccessCode()
+        {
+            var gsm = GameStateManager.Instance;
+            if (gsm == null || string.IsNullOrEmpty(gsm.AccessCode) || gsm.AccessCode.Length != 4) return;
+            string code = gsm.AccessCode;
+            for (int row = 0; row < 4; row++)
+            {
+                int d = code[row] - '0';
+                if (d < 0 || d > 9) return;
+                for (int col = 0; col < 4; col++)
+                {
+                    int weight = 8 >> col;
+                    bool bit = (d & weight) != 0;
+                    int idx = row * 4 + col;
+                    if (idx < Drawers.Length && Drawers[idx] != null)
+                        Drawers[idx].Bit = bit;
+                }
+            }
         }
 
         void OnDisable()

@@ -29,6 +29,9 @@ namespace SipLab
         public event Action OnEnergyCoreObtained;
         public event Action OnKeycardObtained;
         public event Action OnVictory;
+        public event System.Action OnRunStarted;
+
+        public string AccessCode { get; private set; }
 
         void Awake()
         {
@@ -74,6 +77,8 @@ namespace SipLab
             IsPowerOn = false;
             HasEnergyCore = false;
             HasKeycard = false;
+            AccessCode = UnityEngine.Random.Range(0, 10000).ToString("D4");
+            OnRunStarted?.Invoke();
             SetState(GameState.Playing);
         }
 
