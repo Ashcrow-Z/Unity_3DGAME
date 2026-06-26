@@ -199,4 +199,4 @@ public interface IInteractable
 
 ## License
 
-仅用于课程作业 (CPT306 CW2) 提交，无商业用途。
+仅用于学习实践，无商业用途。
