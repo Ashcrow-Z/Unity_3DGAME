@@ -1,6 +1,6 @@
 # The SIP Lab Lockdown
 
-一个用 Unity 2022.3 + Built-in Render Pipeline 实现的第一人称 3D 密室逃脱小游戏。课程作业 (CPT306 CW2)。
+一个用 Unity 2022.3 + Built-in Render Pipeline 实现的第一人称 3D 密室逃脱小游戏。
 
 整个游戏的几何体、材质、音效、UI 全部由代码生成 —— **零外部美术资源 / 音频文件**。
 
@@ -182,7 +182,7 @@ public interface IInteractable
 
 ---
 
-## 验收要点（对照课程要求）
+## 验收要点
 
 - ✅ 房间 10×4×10、玩家初始 (0, 1.1, -4)、出口在北墙中心
 - ✅ 红光初始氛围 / 通电后白光
